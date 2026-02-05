@@ -2,7 +2,7 @@
  import { Header } from '@/components/Header';
  import { Footer } from '@/components/Footer';
  import { IssueCard } from '@/components/IssueCard';
- import { mockIssues } from '@/data/mockIssues';
+ import { useIssues } from '@/context/IssuesContext';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,12 +11,13 @@
  import { Search, Filter, MapPin, List, LayoutGrid } from 'lucide-react';
  
  const TrackIssues = () => {
+   const { issues } = useIssues();
    const [searchQuery, setSearchQuery] = useState('');
    const [categoryFilter, setCategoryFilter] = useState<string>('all');
    const [statusFilter, setStatusFilter] = useState<string>('all');
    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
  
-   const filteredIssues = mockIssues.filter(issue => {
+   const filteredIssues = issues.filter(issue => {
      const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
        issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
        issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
@@ -28,10 +29,10 @@
    });
  
    const statusCounts = {
-     all: mockIssues.length,
-     reported: mockIssues.filter(i => i.status === 'reported').length,
-     in_progress: mockIssues.filter(i => i.status === 'in_progress').length,
-     resolved: mockIssues.filter(i => i.status === 'resolved').length,
+     all: issues.length,
+     reported: issues.filter(i => i.status === 'reported').length,
+     in_progress: issues.filter(i => i.status === 'in_progress').length,
+     resolved: issues.filter(i => i.status === 'resolved').length,
    };
  
    return (

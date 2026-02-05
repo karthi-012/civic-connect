@@ -5,7 +5,7 @@
  import { IssueCard } from '@/components/IssueCard';
  import { StatusBadge } from '@/components/StatusBadge';
  import { PriorityBadge } from '@/components/PriorityBadge';
- import { mockIssues } from '@/data/mockIssues';
+ import { useIssues } from '@/context/IssuesContext';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,6 +21,7 @@
  import { toast } from 'sonner';
  
  const AuthorityDashboard = () => {
+   const { issues, updateIssueStatus } = useIssues();
    const [searchQuery, setSearchQuery] = useState('');
    const [categoryFilter, setCategoryFilter] = useState<string>('all');
    const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -30,34 +31,34 @@
      { 
        icon: FileText, 
        label: 'Total Issues', 
-       value: mockIssues.length,
+       value: issues.length,
        change: '+12 this week',
        changeType: 'neutral' as const
      },
      { 
        icon: AlertTriangle, 
        label: 'Pending', 
-       value: mockIssues.filter(i => i.status === 'reported').length,
+       value: issues.filter(i => i.status === 'reported').length,
        change: '-3 from yesterday',
        changeType: 'positive' as const
      },
      { 
        icon: Clock, 
        label: 'In Progress', 
-       value: mockIssues.filter(i => i.status === 'in_progress').length,
+       value: issues.filter(i => i.status === 'in_progress').length,
        change: '+5 assigned today',
        changeType: 'neutral' as const
      },
      { 
        icon: CheckCircle, 
        label: 'Resolved', 
-       value: mockIssues.filter(i => i.status === 'resolved').length,
+       value: issues.filter(i => i.status === 'resolved').length,
        change: '83% resolution rate',
        changeType: 'positive' as const
      },
    ];
  
-   const filteredIssues = mockIssues.filter(issue => {
+   const filteredIssues = issues.filter(issue => {
      const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
        issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
      const matchesCategory = categoryFilter === 'all' || issue.category === categoryFilter;
@@ -66,12 +67,15 @@
    });
  
    const handleStatusChange = (issueId: string, newStatus: IssueStatus) => {
+     updateIssueStatus(issueId, newStatus);
      toast.success(`Issue status updated to "${STATUS_LABELS[newStatus]}"`);
      setSelectedIssue(null);
    };
  
    const handleAssign = (issueId: string) => {
+     updateIssueStatus(issueId, 'in_progress', 'Field Worker Team A');
      toast.success('Issue assigned to field worker');
+     setSelectedIssue(null);
    };
  
    return (

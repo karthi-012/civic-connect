@@ -8,10 +8,14 @@
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
  import { CATEGORY_LABELS, CATEGORY_ICONS, IssueCategory, IssuePriority, PRIORITY_LABELS } from '@/types/issue';
  import { motion } from 'framer-motion';
- import { Camera, MapPin, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+ import { Camera, MapPin, Upload, CheckCircle, AlertCircle, Loader2, Eye } from 'lucide-react';
  import { toast } from 'sonner';
+ import { useIssues } from '@/context/IssuesContext';
+ import { Link, useNavigate } from 'react-router-dom';
  
  const CitizenDashboard = () => {
+   const { addIssue, getUserIssues } = useIssues();
+   const navigate = useNavigate();
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [imagePreview, setImagePreview] = useState<string | null>(null);
    const [formData, setFormData] = useState({
@@ -72,11 +76,29 @@
      }
  
      setIsSubmitting(true);
-     
-     // Simulate API call
-     await new Promise(resolve => setTimeout(resolve, 2000));
-     
-     toast.success('Issue reported successfully! You will receive updates on your complaint.');
+
+     // Simulate short delay
+     await new Promise(resolve => setTimeout(resolve, 1000));
+
+     // Add issue to global state
+     const newIssue = addIssue({
+       title: formData.title,
+       description: formData.description,
+       category: formData.category as IssueCategory,
+       priority: formData.priority,
+       address: formData.address || 'Location not specified',
+       imageUrl: imagePreview || undefined,
+       lat: location?.lat,
+       lng: location?.lng,
+       reportedBy: 'Current User', // This would come from auth in a real app
+     });
+
+     toast.success('Issue reported successfully! Track your complaint in the Track Issues page.', {
+       action: {
+         label: 'View Reports',
+         onClick: () => navigate('/track'),
+       },
+     });
      setIsSubmitting(false);
      
      // Reset form
@@ -298,6 +320,51 @@
                <li>• Check if the issue has already been reported to avoid duplicates</li>
              </ul>
            </motion.div>
+
+             {/* My Recent Reports */}
+             <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               transition={{ delay: 0.4 }}
+               className="mt-6 p-6 bg-card rounded-xl border border-border"
+             >
+               <div className="flex items-center justify-between mb-4">
+                 <h3 className="font-semibold text-foreground">Your Recent Reports</h3>
+                 <Link to="/track">
+                   <Button variant="ghost" size="sm" className="gap-1">
+                     <Eye className="w-4 h-4" />
+                     View All
+                   </Button>
+                 </Link>
+               </div>
+               {getUserIssues('Current User').length > 0 ? (
+                 <div className="space-y-3">
+                   {getUserIssues('Current User').slice(0, 3).map(issue => (
+                     <div key={issue.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                       <div className="flex items-center gap-3">
+                         <span className="text-lg">{CATEGORY_ICONS[issue.category]}</span>
+                         <div>
+                           <p className="font-medium text-sm">{issue.title}</p>
+                           <p className="text-xs text-muted-foreground">{issue.location.address}</p>
+                         </div>
+                       </div>
+                       <span className={`text-xs px-2 py-1 rounded-full ${
+                         issue.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                         issue.status === 'in_progress' ? 'bg-amber-100 text-amber-700' :
+                         'bg-blue-100 text-blue-700'
+                       }`}>
+                         {issue.status === 'in_progress' ? 'In Progress' : 
+                          issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
+                       </span>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <p className="text-sm text-muted-foreground text-center py-4">
+                   No reports yet. Submit your first civic issue above!
+                 </p>
+               )}
+             </motion.div>
          </motion.div>
        </main>
        
