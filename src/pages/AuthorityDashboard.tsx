@@ -27,36 +27,42 @@
    const [statusFilter, setStatusFilter] = useState<string>('all');
    const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
  
-   const stats = [
-     { 
-       icon: FileText, 
-       label: 'Total Issues', 
-       value: issues.length,
-       change: '+12 this week',
-       changeType: 'neutral' as const
-     },
-     { 
-       icon: AlertTriangle, 
-       label: 'Pending', 
-       value: issues.filter(i => i.status === 'reported').length,
-       change: '-3 from yesterday',
-       changeType: 'positive' as const
-     },
-     { 
-       icon: Clock, 
-       label: 'In Progress', 
-       value: issues.filter(i => i.status === 'in_progress').length,
-       change: '+5 assigned today',
-       changeType: 'neutral' as const
-     },
-     { 
-       icon: CheckCircle, 
-       label: 'Resolved', 
-       value: issues.filter(i => i.status === 'resolved').length,
-       change: '83% resolution rate',
-       changeType: 'positive' as const
-     },
-   ];
+  const totalIssues = issues.length;
+  const pendingCount = issues.filter(i => i.status === 'reported').length;
+  const inProgressCount = issues.filter(i => i.status === 'in_progress').length;
+  const resolvedCount = issues.filter(i => i.status === 'resolved').length;
+  const resolutionRate = totalIssues > 0 ? Math.round((resolvedCount / totalIssues) * 100) : 0;
+
+  const stats = [
+    { 
+      icon: FileText, 
+      label: 'Total Issues', 
+      value: totalIssues,
+      change: totalIssues > 0 ? `${totalIssues} total` : 'No issues yet',
+      changeType: 'neutral' as const
+    },
+    { 
+      icon: AlertTriangle, 
+      label: 'Pending', 
+      value: pendingCount,
+      change: pendingCount > 0 ? 'Needs attention' : 'All clear',
+      changeType: pendingCount > 0 ? 'negative' as const : 'positive' as const
+    },
+    { 
+      icon: Clock, 
+      label: 'In Progress', 
+      value: inProgressCount,
+      change: inProgressCount > 0 ? 'Being worked on' : 'None active',
+      changeType: 'neutral' as const
+    },
+    { 
+      icon: CheckCircle, 
+      label: 'Resolved', 
+      value: resolvedCount,
+      change: totalIssues > 0 ? `${resolutionRate}% resolution rate` : 'No data',
+      changeType: 'positive' as const
+    },
+  ];
  
    const filteredIssues = issues.filter(issue => {
      const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -144,16 +150,17 @@
            <div className="bg-card rounded-xl border border-border overflow-hidden">
              <div className="overflow-x-auto">
                <table className="w-full">
-                 <thead>
-                   <tr className="border-b border-border bg-muted/50">
-                     <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Issue</th>
-                     <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden md:table-cell">Location</th>
-                     <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Status</th>
-                     <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Priority</th>
-                     <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Reported</th>
-                     <th className="text-right p-4 font-semibold text-sm text-muted-foreground">Actions</th>
-                   </tr>
-                 </thead>
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Issue</th>
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden md:table-cell">Location</th>
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Status</th>
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Priority</th>
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Reported</th>
+                      <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden md:table-cell">Reported By</th>
+                      <th className="text-right p-4 font-semibold text-sm text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
                  <tbody>
                    {filteredIssues.map((issue, i) => (
                      <motion.tr
@@ -185,11 +192,16 @@
                        <td className="p-4 hidden lg:table-cell">
                          <PriorityBadge priority={issue.priority} />
                        </td>
-                       <td className="p-4 hidden lg:table-cell">
-                         <span className="text-sm text-muted-foreground">
-                           {formatDistanceToNow(issue.reportedAt, { addSuffix: true })}
-                         </span>
-                       </td>
+                        <td className="p-4 hidden lg:table-cell">
+                          <span className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(issue.reportedAt, { addSuffix: true })}
+                          </span>
+                        </td>
+                        <td className="p-4 hidden md:table-cell">
+                          <span className="text-sm text-foreground font-medium">
+                            {issue.reportedBy}
+                          </span>
+                        </td>
                        <td className="p-4 text-right">
                          <Button 
                            size="sm" 
