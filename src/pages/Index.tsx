@@ -199,8 +199,7 @@ const Index = () => {
                Be the Change in Your Community
              </h2>
              <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
-               Join thousands of citizens who are making their neighborhoods better, 
-               one report at a time.
+               Start reporting civic issues in your neighborhood and help make your city better.
              </p>
              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                <Link to="/citizen">

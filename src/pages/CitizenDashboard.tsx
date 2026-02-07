@@ -39,28 +39,30 @@
      }
    };
  
-   const getLocation = () => {
-     setLocationLoading(true);
-     if (navigator.geolocation) {
-       navigator.geolocation.getCurrentPosition(
-         (position) => {
-           setLocation({
-             lat: position.coords.latitude,
-             lng: position.coords.longitude,
-           });
-           setLocationLoading(false);
-           toast.success('Location captured successfully!');
-         },
-         (error) => {
-           setLocationLoading(false);
-           toast.error('Unable to get location. Please enter address manually.');
-         }
-       );
-     } else {
-       setLocationLoading(false);
-       toast.error('Geolocation is not supported by your browser.');
-     }
-   };
+  const getLocation = () => {
+    setLocationLoading(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setLocation({ lat, lng });
+          // Auto-fill the address field with coordinates
+          const locationString = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          setFormData(prev => ({ ...prev, address: locationString }));
+          setLocationLoading(false);
+          toast.success('Location captured and filled in address!');
+        },
+        (error) => {
+          setLocationLoading(false);
+          toast.error('Unable to get location. Please enter address manually.');
+        }
+      );
+    } else {
+      setLocationLoading(false);
+      toast.error('Geolocation is not supported by your browser.');
+    }
+  };
  
    const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
