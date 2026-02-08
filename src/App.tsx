@@ -1,37 +1,62 @@
- import { Toaster } from "@/components/ui/toaster";
- import { Toaster as Sonner } from "@/components/ui/sonner";
- import { TooltipProvider } from "@/components/ui/tooltip";
- import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
- import { BrowserRouter, Routes, Route } from "react-router-dom";
- import { IssuesProvider } from "./context/IssuesContext";
- import Index from "./pages/Index";
- import CitizenDashboard from "./pages/CitizenDashboard";
- import TrackIssues from "./pages/TrackIssues";
- import AuthorityDashboard from "./pages/AuthorityDashboard";
- import Auth from "./pages/Auth";
- import NotFound from "./pages/NotFound";
- 
- const queryClient = new QueryClient();
- 
- const App = () => (
-   <QueryClientProvider client={queryClient}>
-     <TooltipProvider>
-       <IssuesProvider>
-         <Toaster />
-         <Sonner />
-         <BrowserRouter>
-           <Routes>
-             <Route path="/" element={<Index />} />
-             <Route path="/citizen" element={<CitizenDashboard />} />
-             <Route path="/track" element={<TrackIssues />} />
-             <Route path="/authority" element={<AuthorityDashboard />} />
-             <Route path="/auth" element={<Auth />} />
-             <Route path="*" element={<NotFound />} />
-           </Routes>
-         </BrowserRouter>
-       </IssuesProvider>
-     </TooltipProvider>
-   </QueryClientProvider>
- );
- 
- export default App;
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./hooks/useAuth";
+import { IssuesProvider } from "./hooks/useIssues";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import Index from "./pages/Index";
+import CitizenDashboard from "./pages/CitizenDashboard";
+import TrackIssues from "./pages/TrackIssues";
+import AuthorityDashboard from "./pages/AuthorityDashboard";
+import Auth from "./pages/Auth";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <IssuesProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route 
+                path="/citizen" 
+                element={
+                  <ProtectedRoute allowedRoles={['citizen']}>
+                    <CitizenDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/track" 
+                element={
+                  <ProtectedRoute allowedRoles={['citizen']}>
+                    <TrackIssues />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/authority" 
+                element={
+                  <ProtectedRoute allowedRoles={['authority']}>
+                    <AuthorityDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </IssuesProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
