@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Button as UiButton } from '@/components/ui/button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff, Building2, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, Building2, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
@@ -120,6 +121,13 @@ const Auth = () => {
           animate={{ opacity: 1, x: 0 }}
           className="w-full max-w-md"
         >
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
           <Link to="/" className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
               <span className="text-xl">🏛️</span>

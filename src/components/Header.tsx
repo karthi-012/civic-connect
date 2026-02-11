@@ -1,6 +1,6 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User } from 'lucide-react';
+import { Menu, X, User, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +8,9 @@ import { useAuth } from '@/hooks/useAuth';
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, role, isLoading } = useAuth();
+  const showBack = location.pathname !== '/';
   
   // Show different nav links based on auth state and role
   const getNavLinks = () => {
@@ -34,14 +36,26 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full bg-card/80 backdrop-blur-lg border-b border-border">
       <div className="container flex h-16 items-center justify-between px-4">
-        <Link to={user ? (role === 'authority' ? '/authority' : '/citizen') : '/'} className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-            <span className="text-xl">🏛️</span>
-          </div>
-          <span className="font-display font-bold text-lg text-foreground hidden sm:block">
-            CivicResolve
-          </span>
-        </Link>
+        <div className="flex items-center gap-2">
+          {showBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="mr-1"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <Link to={user ? (role === 'authority' ? '/authority' : '/citizen') : '/'} className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+              <span className="text-xl">🏛️</span>
+            </div>
+            <span className="font-display font-bold text-lg text-foreground hidden sm:block">
+              CivicResolve
+            </span>
+          </Link>
+        </div>
         
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-1">
