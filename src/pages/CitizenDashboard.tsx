@@ -45,14 +45,30 @@ const CitizenDashboard = () => {
     setLocationLoading(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setLocation({ lat, lng });
-          const locationString = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          setFormData(prev => ({ ...prev, address: locationString }));
+          
+          // Reverse geocode to get a proper address
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+              { headers: { 'Accept-Language': 'en' } }
+            );
+            const data = await response.json();
+            if (data.display_name) {
+              setFormData(prev => ({ ...prev, address: data.display_name }));
+              toast.success('Address detected from your location!');
+            } else {
+              setFormData(prev => ({ ...prev, address: `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}` }));
+              toast.success('Location captured! You can edit the address above.');
+            }
+          } catch {
+            setFormData(prev => ({ ...prev, address: `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}` }));
+            toast.success('Location captured! You can edit the address above.');
+          }
           setLocationLoading(false);
-          toast.success('Location captured and filled in address!');
         },
         (error) => {
           setLocationLoading(false);
