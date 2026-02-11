@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import TrackIssues from "./pages/TrackIssues";
 import AuthorityDashboard from "./pages/AuthorityDashboard";
+import AuthSelect from "./pages/AuthSelect";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -25,7 +26,8 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth" element={<AuthSelect />} />
+              <Route path="/auth/:userType" element={<Auth />} />
               <Route 
                 path="/citizen" 
                 element={

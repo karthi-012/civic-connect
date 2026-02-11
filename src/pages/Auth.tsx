@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button as UiButton } from '@/components/ui/button';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,8 +13,12 @@ const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 const Auth = () => {
+  const { userType } = useParams<{ userType: string }>();
+  const isCitizen = userType === 'citizen';
+  const roleLabel = isCitizen ? 'Citizen' : 'Authority';
+  const RoleIcon = isCitizen ? User : Building2;
+
   const [isLogin, setIsLogin] = useState(true);
-  const [isCitizen, setIsCitizen] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -29,7 +32,6 @@ const Auth = () => {
 
   const [errors, setErrors] = useState<{ email?: string; password?: string; name?: string }>({});
 
-  // Redirect if already logged in
   if (!authLoading && user && role) {
     navigate(role === 'authority' ? '/authority' : '/citizen', { replace: true });
     return null;
@@ -37,30 +39,30 @@ const Auth = () => {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string; name?: string } = {};
-    
+
     const emailResult = emailSchema.safeParse(formData.email);
     if (!emailResult.success) {
       newErrors.email = emailResult.error.errors[0].message;
     }
-    
+
     const passwordResult = passwordSchema.safeParse(formData.password);
     if (!passwordResult.success) {
       newErrors.password = passwordResult.error.errors[0].message;
     }
-    
+
     if (!isLogin && !formData.name.trim()) {
       newErrors.name = 'Please enter your full name';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
 
     try {
@@ -80,8 +82,8 @@ const Auth = () => {
         toast.success('Welcome back!');
       } else {
         const { error } = await signUp(
-          formData.email, 
-          formData.password, 
+          formData.email,
+          formData.password,
           formData.name,
           isCitizen ? 'citizen' : 'authority'
         );
@@ -100,7 +102,7 @@ const Auth = () => {
     } catch (err) {
       toast.error('An unexpected error occurred. Please try again.');
     }
-    
+
     setIsLoading(false);
   };
 
@@ -122,12 +124,13 @@ const Auth = () => {
           className="w-full max-w-md"
         >
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/auth')}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Back</span>
           </button>
+
           <Link to="/" className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
               <span className="text-xl">🏛️</span>
@@ -136,47 +139,25 @@ const Auth = () => {
               CivicResolve
             </span>
           </Link>
-          
+
+          {/* Role indicator */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+            <RoleIcon className="w-4 h-4" />
+            {roleLabel} Portal
+          </div>
+
           <h1 className="text-2xl font-display font-bold text-foreground mb-2">
-            {isLogin ? 'Welcome back' : 'Create your account'}
+            {isLogin ? `${roleLabel} Sign In` : `Create ${roleLabel} Account`}
           </h1>
           <p className="text-muted-foreground mb-8">
-            {isLogin 
-              ? 'Enter your credentials to access your account' 
-              : 'Join us to report or manage civic issues'
+            {isLogin
+              ? `Enter your credentials to access your ${roleLabel.toLowerCase()} dashboard`
+              : isCitizen
+                ? 'Join us to report civic issues in your area'
+                : 'Sign up to manage and resolve civic issues'
             }
           </p>
-          
-          {/* User Type Toggle - Only show for signup */}
-          {!isLogin && (
-            <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
-              <button
-                type="button"
-                onClick={() => setIsCitizen(true)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                  isCitizen 
-                    ? 'bg-card text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                Citizen
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCitizen(false)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
-                  !isCitizen 
-                    ? 'bg-card text-foreground shadow-sm' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Building2 className="w-4 h-4" />
-                Authority
-              </button>
-            </div>
-          )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
@@ -195,7 +176,7 @@ const Auth = () => {
                 {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -211,7 +192,7 @@ const Auth = () => {
               </div>
               {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -234,7 +215,7 @@ const Auth = () => {
               </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>
-            
+
             <Button
               type="submit"
               className="w-full py-6 text-base gradient-hero"
@@ -253,7 +234,7 @@ const Auth = () => {
               )}
             </Button>
           </form>
-          
+
           <p className="text-center text-sm text-muted-foreground mt-6">
             {isLogin ? "Don't have an account?" : 'Already have an account?'}
             <button
@@ -269,11 +250,10 @@ const Auth = () => {
           </p>
         </motion.div>
       </div>
-      
+
       {/* Right Side - Decorative */}
       <div className="hidden lg:flex flex-1 gradient-hero items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -281,14 +261,16 @@ const Auth = () => {
           className="text-center text-primary-foreground relative z-10"
         >
           <div className="w-24 h-24 rounded-3xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
-            <span className="text-5xl">🏛️</span>
+            <span className="text-5xl">{isCitizen ? '👤' : '👔'}</span>
           </div>
           <h2 className="text-3xl font-display font-bold mb-4">
-            Make Your City Better
+            {isCitizen ? 'Report & Track Issues' : 'Manage & Resolve Issues'}
           </h2>
           <p className="text-primary-foreground/80 max-w-md">
-            Report civic issues, track resolutions, and contribute to 
-            building a transparent and accountable governance system.
+            {isCitizen
+              ? 'Report civic problems in your area and track their resolution in real-time.'
+              : 'Review, assign, and resolve civic issues reported by citizens efficiently.'
+            }
           </p>
         </motion.div>
       </div>
