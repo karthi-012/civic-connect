@@ -67,9 +67,34 @@ export function IssuesProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      let processedIssues = issuesData || [];
+
+      // Reverse geocode issues that only have GPS-format addresses
+      const geocodePromises = processedIssues.map(async (issue) => {
+        if (issue.lat && issue.lng && (!issue.address || issue.address.startsWith('GPS:'))) {
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${issue.lat}&lon=${issue.lng}&addressdetails=1`,
+              { headers: { 'Accept-Language': 'en', 'User-Agent': 'CivicIssueTracker/1.0' } }
+            );
+            const data = await response.json();
+            if (data.display_name) {
+              // Update the address in the database for future fetches
+              await supabase.from('issues').update({ address: data.display_name }).eq('id', issue.id);
+              return { ...issue, address: data.display_name };
+            }
+          } catch {
+            // Keep the existing address on failure
+          }
+        }
+        return issue;
+      });
+
+      processedIssues = await Promise.all(geocodePromises);
+
       // For authorities, fetch reporter names
-      if (role === 'authority' && issuesData) {
-        const userIds = [...new Set(issuesData.map(i => i.user_id))];
+      if (role === 'authority' && processedIssues.length > 0) {
+        const userIds = [...new Set(processedIssues.map(i => i.user_id))];
         const { data: profiles } = await supabase
           .from('profiles')
           .select('user_id, full_name')
@@ -77,15 +102,13 @@ export function IssuesProvider({ children }: { children: ReactNode }) {
 
         const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
         
-        const issuesWithNames = issuesData.map(issue => ({
+        processedIssues = processedIssues.map(issue => ({
           ...issue,
           reporter_name: profileMap.get(issue.user_id) || 'Unknown User',
         }));
-        
-        setIssues(issuesWithNames);
-      } else {
-        setIssues(issuesData || []);
       }
+
+      setIssues(processedIssues);
     } catch (err) {
       console.error('Error:', err);
     } finally {

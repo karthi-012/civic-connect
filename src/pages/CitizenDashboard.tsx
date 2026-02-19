@@ -54,7 +54,7 @@ const CitizenDashboard = () => {
           try {
             const response = await fetch(
               `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-              { headers: { 'Accept-Language': 'en' } }
+              { headers: { 'Accept-Language': 'en', 'User-Agent': 'CivicIssueTracker/1.0' } }
             );
             const data = await response.json();
             if (data.display_name) {
