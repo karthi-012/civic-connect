@@ -235,7 +235,19 @@ const Auth = () => {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
+          {isLogin && (
+            <div className="text-center mt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/auth/forgot-password')}
+                className="text-sm text-primary font-medium hover:underline"
+              >
+                Forgot your password?
+              </button>
+            </div>
+          )}
+
+          <p className="text-center text-sm text-muted-foreground mt-4">
             {isLogin ? "Don't have an account?" : 'Already have an account?'}
             <button
               type="button"

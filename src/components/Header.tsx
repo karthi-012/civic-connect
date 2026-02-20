@@ -11,6 +11,19 @@ export function Header() {
   const navigate = useNavigate();
   const { user, role, isLoading } = useAuth();
   const showBack = location.pathname !== '/';
+
+  const handleBack = () => {
+    // Avoid going back to blank auth-redirect or protected states
+    const safeFallback = user
+      ? role === 'authority' ? '/authority' : '/citizen'
+      : '/';
+    // If there's real history to go back to (not the initial page load), use it
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate(safeFallback, { replace: true });
+    }
+  };
   
   // Show different nav links based on auth state and role
   const getNavLinks = () => {
@@ -41,7 +54,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="mr-1"
             >
               <ArrowLeft className="h-5 w-5" />
