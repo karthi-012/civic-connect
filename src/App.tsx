@@ -12,6 +12,8 @@ import TrackIssues from "./pages/TrackIssues";
 import AuthorityDashboard from "./pages/AuthorityDashboard";
 import AuthSelect from "./pages/AuthSelect";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,7 +29,9 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthSelect />} />
+              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
               <Route path="/auth/:userType" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route 
                 path="/citizen" 
                 element={
