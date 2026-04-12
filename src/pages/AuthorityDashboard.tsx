@@ -14,7 +14,7 @@ import { CATEGORY_LABELS, STATUS_LABELS, IssueCategory, IssueStatus, CATEGORY_IC
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Clock, CheckCircle, AlertTriangle, Search, 
-  MapPin, Calendar, X, UserPlus, Loader2, LogOut, Send
+  MapPin, Calendar, X, UserPlus, Loader2, LogOut, Send, Navigation
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -37,7 +37,21 @@ interface Issue {
   updated_at: string;
   resolved_at: string | null;
   reporter_name?: string;
+  distance?: number;
 }
+
+// Haversine formula to calculate distance between two coordinates
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const AuthorityDashboard = () => {
   const { issues, updateIssueStatus, isLoading } = useIssuesContext();
@@ -50,11 +64,41 @@ const AuthorityDashboard = () => {
   const [resolutionDetails, setResolutionDetails] = useState('');
   const [resolvedMessage, setResolvedMessage] = useState('');
   const [showResolutionForm, setShowResolutionForm] = useState(false);
+  const [showNearbyReports, setShowNearbyReports] = useState(false);
+  const [authorityLocation, setAuthorityLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  const totalIssues = issues.length;
-  const pendingCount = issues.filter(i => i.status === 'reported').length;
-  const inProgressCount = issues.filter(i => i.status === 'in_progress').length;
-  const resolvedCount = issues.filter(i => i.status === 'resolved').length;
+  const filteredIssues = issues.filter(issue => {
+    const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (issue.address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    const matchesCategory = categoryFilter === 'all' || issue.category === categoryFilter;
+    const matchesStatus = statusFilter === 'all' || issue.status === statusFilter;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  // Filter nearby issues (10km radius)
+  const nearbyIssues = authorityLocation
+    ? (filteredIssues as Issue[])
+        .filter(issue => issue.lat && issue.lng)
+        .map((issue: Issue) => ({
+          ...issue,
+          distance: calculateDistance(
+            authorityLocation.lat,
+            authorityLocation.lng,
+            issue.lat!,
+            issue.lng!
+          ),
+        }))
+        .filter(issue => (issue.distance || 0) <= 10)
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0)) as Issue[]
+    : [];
+
+  const displayIssues = (showNearbyReports && authorityLocation ? nearbyIssues : filteredIssues) as Issue[];
+
+  const totalIssues = displayIssues.length;
+  const pendingCount = displayIssues.filter(i => i.status === 'reported').length;
+  const inProgressCount = displayIssues.filter(i => i.status === 'in_progress').length;
+  const resolvedCount = displayIssues.filter(i => i.status === 'resolved').length;
   const resolutionRate = totalIssues > 0 ? Math.round((resolvedCount / totalIssues) * 100) : 0;
 
   const stats = [
@@ -88,13 +132,63 @@ const AuthorityDashboard = () => {
     },
   ];
 
-  const filteredIssues = issues.filter(issue => {
-    const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (issue.address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    const matchesCategory = categoryFilter === 'all' || issue.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || issue.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  // Handle fetching nearby reports
+  const handleFetchNearbyReports = async () => {
+    setFetchingLocation(true);
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const newLocation = { lat: latitude, lng: longitude };
+            
+            // Calculate nearby issues with the new location
+            const nearby = (filteredIssues as Issue[])
+              .filter(issue => issue.lat && issue.lng)
+              .map((issue: Issue) => ({
+                ...issue,
+                distance: calculateDistance(
+                  newLocation.lat,
+                  newLocation.lng,
+                  issue.lat!,
+                  issue.lng!
+                ),
+              }))
+              .filter(issue => (issue.distance || 0) <= 10)
+              .sort((a, b) => (a.distance || 0) - (b.distance || 0)) as Issue[];
+            
+            setAuthorityLocation(newLocation);
+            setShowNearbyReports(true);
+            toast.success(`Found ${nearby.length} issues within 10km of your location`);
+            setFetchingLocation(false);
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            toast.error('Unable to access your location. Please enable location permissions.');
+            setFetchingLocation(false);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        toast.error('Geolocation is not supported by your browser');
+        setFetchingLocation(false);
+      }
+    } catch (err) {
+      console.error('Error fetching location:', err);
+      toast.error('Failed to fetch nearby reports');
+      setFetchingLocation(false);
+    }
+  };
+
+  const handleResetToAllReports = () => {
+    setShowNearbyReports(false);
+    setAuthorityLocation(null);
+    toast.info('Showing all reports');
+  };
 
   const handleStatusChange = async (issueId: string, newStatus: IssueStatus) => {
     if (newStatus === 'resolved') {
@@ -170,7 +264,10 @@ const AuthorityDashboard = () => {
               Authority Dashboard
             </h1>
             <p className="text-muted-foreground">
-              Manage and resolve civic issues reported by citizens
+              {showNearbyReports 
+                ? `Showing civic issues within 10km of your location (${displayIssues.length} total)`
+                : "Manage and resolve civic issues reported by citizens"
+              }
             </p>
           </div>
           
@@ -182,40 +279,71 @@ const AuthorityDashboard = () => {
           </div>
           
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="Search by title or location..."
-                className="pl-10 input-civic"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search by title or location..."
+                  className="pl-10 input-civic"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-48 input-civic">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {(Object.keys(CATEGORY_LABELS) as IssueCategory[]).map(cat => (
+                    <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-40 input-civic">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  {(Object.keys(STATUS_LABELS) as IssueStatus[]).map(status => (
+                    <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-48 input-civic">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {(Object.keys(CATEGORY_LABELS) as IssueCategory[]).map(cat => (
-                  <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40 input-civic">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {(Object.keys(STATUS_LABELS) as IssueStatus[]).map(status => (
-                  <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Nearby Reports Button */}
+            <div className="flex gap-2 flex-wrap">
+              {!showNearbyReports ? (
+                <Button 
+                  className="gap-2"
+                  onClick={handleFetchNearbyReports}
+                  disabled={fetchingLocation}
+                >
+                  <Navigation className="w-4 h-4" />
+                  {fetchingLocation ? 'Fetching Location...' : 'Fetch Nearby Reports (10km)'}
+                </Button>
+              ) : (
+                <div className="flex gap-2 items-center bg-primary/10 px-4 py-2 rounded-lg border border-primary/20">
+                  <Navigation className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">
+                    Showing {displayIssues.length} nearby reports within 10km
+                  </span>
+                  <Button 
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetToAllReports}
+                    className="h-6"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           
           {/* Issues Table */}
@@ -231,6 +359,9 @@ const AuthorityDashboard = () => {
                     <tr className="border-b border-border bg-muted/50">
                       <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Issue</th>
                       <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden md:table-cell">Location</th>
+                      {showNearbyReports && (
+                        <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Distance</th>
+                      )}
                       <th className="text-left p-4 font-semibold text-sm text-muted-foreground">Status</th>
                       <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Priority</th>
                       <th className="text-left p-4 font-semibold text-sm text-muted-foreground hidden lg:table-cell">Reported</th>
@@ -239,7 +370,7 @@ const AuthorityDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredIssues.map((issue, i) => (
+                    {displayIssues.map((issue, i) => (
                       <motion.tr
                         key={issue.id}
                         initial={{ opacity: 0 }}
@@ -263,6 +394,18 @@ const AuthorityDashboard = () => {
                             <span className="line-clamp-1">{issue.address || 'Not specified'}</span>
                           </span>
                         </td>
+                        {showNearbyReports && (
+                          <td className="p-4">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                              issue.distance && issue.distance <= 5 ? 'bg-green-100 text-green-700' :
+                              issue.distance && issue.distance <= 10 ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              <Navigation className="w-3 h-3" />
+                              {issue.distance?.toFixed(1)} km
+                            </span>
+                          </td>
+                        )}
                         <td className="p-4">
                           <StatusBadge status={issue.status as IssueStatus} size="sm" />
                         </td>
@@ -298,10 +441,12 @@ const AuthorityDashboard = () => {
               </div>
             )}
             
-            {!isLoading && filteredIssues.length === 0 && (
+            {!isLoading && displayIssues.length === 0 && (
               <div className="p-12 text-center">
                 <p className="text-muted-foreground">
-                  {issues.length === 0 
+                  {showNearbyReports 
+                    ? "No issues found within 10km of your location."
+                    : issues.length === 0 
                     ? "No issues have been reported yet. Citizens will see their reports here once submitted."
                     : "No issues match your criteria"
                   }
@@ -349,11 +494,13 @@ const AuthorityDashboard = () => {
               
               <div className="p-6 space-y-6">
                 {selectedIssue.image_url && (
-                  <img 
-                    src={selectedIssue.image_url} 
-                    alt={selectedIssue.title}
-                    className="w-full h-48 object-cover rounded-xl"
-                  />
+                  <div className="relative bg-muted rounded-xl overflow-hidden">
+                    <img 
+                      src={selectedIssue.image_url} 
+                      alt={selectedIssue.title}
+                      className="w-full h-auto max-h-96 object-contain"
+                    />
+                  </div>
                 )}
                 
                 <div>

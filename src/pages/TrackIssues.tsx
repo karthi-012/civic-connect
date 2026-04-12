@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { useIssuesContext } from '@/hooks/useIssues';
@@ -6,9 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CATEGORY_LABELS, CATEGORY_ICONS, IssueCategory, IssueStatus, STATUS_LABELS } from '@/types/issue';
+import { CATEGORY_LABELS, CATEGORY_ICONS, IssueCategory, IssueStatus, STATUS_LABELS, PRIORITY_LABELS, Issue } from '@/types/issue';
+import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
-import { Search, Filter, MapPin, List, LayoutGrid, Loader2, LogOut } from 'lucide-react';
+import { Search, Filter, MapPin, List, LayoutGrid, Loader2, LogOut, X, Calendar, User, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const TrackIssues = () => {
@@ -19,8 +20,57 @@ const TrackIssues = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedIssue, setSelectedIssue] = useState<any>(null);
+  const [transformedIssues, setTransformedIssues] = useState<any[]>([]);
 
-  const filteredIssues = issues.filter(issue => {
+  // Transform issues data to match component expectations and fetch user info
+  useEffect(() => {
+    const transformIssues = async () => {
+      const transformed = await Promise.all(
+        issues.map(async (issue: any) => {
+          let reportedByName = 'You';
+          
+          // Try to get the full name of the person who reported the issue
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', issue.user_id)
+              .single();
+            
+            if (profile?.full_name) {
+              reportedByName = profile.full_name;
+            }
+          } catch (err) {
+            console.error('Error fetching profile:', err);
+          }
+
+          return {
+            ...issue,
+            imageUrl: issue.image_url,
+            reportedBy: issue.reporter_name || reportedByName,
+            reportedAt: new Date(issue.created_at),
+            location: {
+              address: issue.address || 'Unknown',
+              lat: issue.lat || 0,
+              lng: issue.lng || 0,
+            },
+            address: issue.address,
+            upvotes: 0,
+            priority: issue.priority || 'medium',
+          };
+        })
+      );
+      
+      setTransformedIssues(transformed);
+    };
+
+    if (issues.length > 0) {
+      transformIssues();
+    }
+  }, [issues]);
+
+  const filteredIssues = transformedIssues.filter(issue => {
     const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (issue.address?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
@@ -32,10 +82,10 @@ const TrackIssues = () => {
   });
 
   const statusCounts = {
-    all: issues.length,
-    reported: issues.filter(i => i.status === 'reported').length,
-    in_progress: issues.filter(i => i.status === 'in_progress').length,
-    resolved: issues.filter(i => i.status === 'resolved').length,
+    all: transformedIssues.length,
+    reported: transformedIssues.filter(i => i.status === 'reported').length,
+    in_progress: transformedIssues.filter(i => i.status === 'in_progress').length,
+    resolved: transformedIssues.filter(i => i.status === 'resolved').length,
   };
 
   const handleSignOut = async () => {
@@ -156,7 +206,8 @@ const TrackIssues = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-card rounded-xl border border-border p-4"
+                  onClick={() => setSelectedIssue(issue)}
+                  className="bg-card rounded-xl border border-border p-4 cursor-pointer hover:border-primary transition-all hover:shadow-md hover:scale-105 transform"
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">{CATEGORY_ICONS[issue.category as IssueCategory]}</span>
@@ -178,6 +229,10 @@ const TrackIssues = () => {
                           </span>
                         )}
                       </div>
+                      <div className="mt-3 flex items-center gap-2 text-xs text-primary font-medium">
+                        <Eye className="w-4 h-4" />
+                        Click to view full details
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -194,7 +249,7 @@ const TrackIssues = () => {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">No issues found</h3>
               <p className="text-muted-foreground">
-                {issues.length === 0 
+                {transformedIssues.length === 0 
                   ? "You haven't reported any issues yet. Go to Report Issue to submit your first complaint."
                   : "Try adjusting your search or filter criteria"
                 }
@@ -203,6 +258,163 @@ const TrackIssues = () => {
           )}
         </motion.div>
       </main>
+
+      {/* Issue Detail Modal */}
+      {selectedIssue && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setSelectedIssue(null)}
+          className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 overflow-auto"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-card rounded-xl border border-border max-w-2xl w-full max-h-[90vh] overflow-auto z-50 shadow-lg"
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between z-10">
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+                <span className="text-3xl">{CATEGORY_ICONS[selectedIssue.category as IssueCategory]}</span>
+                {selectedIssue.title}
+              </h2>
+              <button
+                onClick={() => setSelectedIssue(null)}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Image - Full Size */}
+              {selectedIssue.imageUrl ? (
+                <div className="rounded-lg overflow-hidden border border-border">
+                  <img 
+                    src={selectedIssue.imageUrl} 
+                    alt={selectedIssue.title}
+                    className="w-full h-auto max-h-[70vh] object-contain"
+                    onError={(e) => {
+                      e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect fill="%23f3f3f3" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%23999" font-size="12"%3ENo image%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg overflow-hidden border border-border bg-muted p-8 flex items-center justify-center h-96">
+                  <p className="text-muted-foreground">No image provided</p>
+                </div>
+              )}
+
+              {/* Status & Priority */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground font-medium">Status</p>
+                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedIssue.status === 'resolved' ? 'bg-green-100 text-green-700' :
+                    selectedIssue.status === 'in_progress' ? 'bg-amber-100 text-amber-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {STATUS_LABELS[selectedIssue.status as IssueStatus]}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground font-medium">Priority</p>
+                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedIssue.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                    selectedIssue.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                    selectedIssue.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {PRIORITY_LABELS[selectedIssue.priority]}
+                  </div>
+                </div>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Category</p>
+                <p className="text-foreground font-medium">{CATEGORY_LABELS[selectedIssue.category as IssueCategory]}</p>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Description</p>
+                <p className="text-foreground whitespace-pre-wrap">{selectedIssue.description}</p>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Location
+                </p>
+                <p className="text-foreground">{selectedIssue.address || selectedIssue.location?.address || 'N/A'}</p>
+                {selectedIssue.location?.lat && selectedIssue.location?.lng && (
+                  <p className="text-xs text-muted-foreground">
+                    Coordinates: {selectedIssue.location.lat.toFixed(4)}, {selectedIssue.location.lng.toFixed(4)}
+                  </p>
+                )}
+              </div>
+
+              {/* Reported By */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Reported By
+                </p>
+                <p className="text-foreground">{selectedIssue.reportedBy || 'Anonymous'}</p>
+              </div>
+
+              {/* Reported At */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Reported On
+                </p>
+                <p className="text-foreground">
+                  {new Date(selectedIssue.reportedAt).toLocaleString()}
+                </p>
+              </div>
+
+              {/* Assigned To */}
+              {selectedIssue.assigned_to && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground font-medium">Assigned To</p>
+                  <p className="text-foreground">{selectedIssue.assigned_to}</p>
+                </div>
+              )}
+
+              {/* Resolved At */}
+              {selectedIssue.resolved_at && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground font-medium">Resolved On</p>
+                  <p className="text-foreground">
+                    {new Date(selectedIssue.resolved_at).toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              {/* Upvotes */}
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Upvotes</p>
+                <p className="text-foreground font-medium text-lg">{selectedIssue.upvotes}</p>
+              </div>
+
+              {/* Close Button */}
+              <Button 
+                onClick={() => setSelectedIssue(null)}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
       
       <Footer />
     </div>

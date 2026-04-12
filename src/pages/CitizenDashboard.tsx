@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CATEGORY_LABELS, CATEGORY_ICONS, IssueCategory, IssuePriority, PRIORITY_LABELS } from '@/types/issue';
 import { motion } from 'framer-motion';
-import { Camera, MapPin, Upload, CheckCircle, AlertCircle, Loader2, Eye, LogOut } from 'lucide-react';
+import { Camera, MapPin, Upload, CheckCircle, AlertCircle, Loader2, Eye, LogOut, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIssuesContext } from '@/hooks/useIssues';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,11 @@ const CitizenDashboard = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -29,6 +34,70 @@ const CitizenDashboard = () => {
   });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
+
+  // Cleanup camera on component unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }, // Use rear camera on mobile
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setIsCameraReady(true);
+        };
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast.error('Unable to access camera. Please check permissions.');
+      setIsCameraActive(false);
+    }
+  };
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        const video = videoRef.current;
+        canvasRef.current.width = video.videoWidth;
+        canvasRef.current.height = video.videoHeight;
+        
+        // Flip horizontally to correct mirror effect
+        context.translate(video.videoWidth, 0);
+        context.scale(-1, 1);
+        context.drawImage(video, 0, 0);
+        
+        const imageData = canvasRef.current.toDataURL('image/jpeg', 0.95);
+        setImagePreview(imageData);
+        stopCamera();
+        toast.success('Image captured successfully!');
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+    setIsCameraReady(false);
+  };
+
+  const handleCancelCamera = () => {
+    stopCamera();
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,6 +244,27 @@ const CitizenDashboard = () => {
             {/* Image Upload */}
             <div className="space-y-2">
               <Label>Photo Evidence</Label>
+              <div className="flex gap-2 mb-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Image
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={startCamera}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Capture Image
+                </Button>
+              </div>
+              
               <div 
                 className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer bg-muted/30"
                 onClick={() => document.getElementById('image-upload')?.click()}
@@ -203,8 +293,8 @@ const CitizenDashboard = () => {
                       <Camera className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">Click to upload photo</p>
-                      <p className="text-sm text-muted-foreground">or drag and drop</p>
+                      <p className="font-medium text-foreground">Photo evidence</p>
+                      <p className="text-sm text-muted-foreground">Upload or capture a photo to help resolve your issue</p>
                     </div>
                   </div>
                 )}
@@ -217,6 +307,74 @@ const CitizenDashboard = () => {
                 />
               </div>
             </div>
+
+            {/* Camera Modal */}
+            {isCameraActive && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+              >
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="w-full max-w-md bg-background rounded-2xl overflow-hidden shadow-xl"
+                >
+                  <div className="relative bg-black">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full aspect-square object-cover"
+                      style={{ transform: 'scaleX(-1)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCancelCamera}
+                      className="absolute top-4 right-4 w-10 h-10 bg-foreground/20 hover:bg-foreground/40 text-foreground rounded-full flex items-center justify-center backdrop-blur-sm transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-4 space-y-3">
+                    {isCameraReady ? (
+                      <>
+                        <p className="text-sm text-muted-foreground text-center">
+                          Position your camera to capture the issue clearly
+                        </p>
+                        <div className="flex gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={handleCancelCamera}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            className="flex-1 gradient-hero"
+                            onClick={captureImage}
+                          >
+                            <Camera className="w-4 h-4 mr-2" />
+                            Capture
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* Hidden Canvas for Image Capture */}
+            <canvas ref={canvasRef} className="hidden" />
             
             {/* Category Selection */}
             <div className="space-y-2">
