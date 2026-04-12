@@ -352,4 +352,4 @@ For issues or questions:
 
 ## 📝 License
 
-Part of Civic Connect project
+Part of civic Connect project
